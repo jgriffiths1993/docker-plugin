@@ -426,26 +426,31 @@ public class DockerCloud extends Cloud {
         }
 
         public FormValidation doTestConnection(
-                @QueryParameter URL serverUrl,
+                @QueryParameter String serverUrl,
                 @QueryParameter String credentialsId,
                 @QueryParameter String version
                 ) throws IOException, ServletException, DockerException {
 
-            DockerClientConfig.DockerClientConfigBuilder config = DockerClientConfig
-                .createDefaultConfigBuilder()
-                .withUri(serverUrl.toString());
+             // Check that docker server URL is specified
+             if( !Strings.isNullOrEmpty(serverUrl) ){
+                 FormValidation.error("Error: No URL specified.");
+             }
 
-            if( !Strings.isNullOrEmpty(version)) {
-                config.withVersion(version);
-            }
-
-            addCredentials(config, credentialsId);
-
-            DockerClient dc = DockerClientBuilder.getInstance(config.build()).build();
-
-            Version v = dc.versionCmd().exec();
-
-            return FormValidation.ok("Version = " + v.getVersion());
+             DockerClientConfig.DockerClientConfigBuilder config = DockerClientConfig
+                 .createDefaultConfigBuilder()
+                 .withUri(serverUrl);
+ 
+             // Use a version if specified
+             if( !Strings.isNullOrEmpty(version) ) {
+                 config.withVersion(version);
+             }
+ 
+             addCredentials(config, credentialsId);
+ 
+             DockerClient dc = DockerClientBuilder.getInstance(config.build()).build();
+             Version v = dc.versionCmd().exec();
+             
+             return FormValidation.ok("Version = " + v.getVersion());
         }
 
         public ListBoxModel doFillCredentialsIdItems(@AncestorInPath ItemGroup context) {
