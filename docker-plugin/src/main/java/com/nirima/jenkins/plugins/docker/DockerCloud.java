@@ -174,7 +174,11 @@ public class DockerCloud extends Cloud {
 
             if( credentials instanceof CertificateCredentials ) {
                 CertificateCredentials certificateCredentials = (CertificateCredentials)credentials;
-                config.withSSLConfig( new KeystoreSSLConfig( certificateCredentials.getKeyStore(), certificateCredentials.getPassword().getPlainText() ));
+                config.withSSLConfig(
+                        new KeystoreSSLConfig(
+                            certificateCredentials.getKeyStore(), 
+                            certificateCredentials.getPassword().getPlainText())
+                        );
             }
             else if( credentials instanceof StandardUsernamePasswordCredentials ) {
                 StandardUsernamePasswordCredentials usernamePasswordCredentials = ((StandardUsernamePasswordCredentials)credentials);
@@ -444,7 +448,7 @@ public class DockerCloud extends Cloud {
              } catch (IllegalArgumentException ex) {
                  return FormValidation.error("Error: Invalid URL: " + serverUrl);
              }
- 
+
              // Use a version if specified
              if( !Strings.isNullOrEmpty(version) ) {
                  config.withVersion(version);
@@ -453,6 +457,7 @@ public class DockerCloud extends Cloud {
              addCredentials(config, credentialsId);
  
              DockerClient dc = DockerClientBuilder.getInstance(config.build()).build();
+
              Version v = dc.versionCmd().exec();
            
              return FormValidation.ok("Connection successful. Version: " + v.getVersion());
