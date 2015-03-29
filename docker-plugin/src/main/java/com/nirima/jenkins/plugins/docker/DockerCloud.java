@@ -432,9 +432,9 @@ public class DockerCloud extends Cloud {
                 ) throws IOException, ServletException, DockerException {
 
              // Check that docker server URL is specified
-             if( !Strings.isNullOrEmpty(serverUrl) ){
-                 FormValidation.error("Error: No URL specified.");
-             }
+             if( Strings.isNullOrEmpty(serverUrl) ){
+                 return FormValidation.error("Error: No URL specified.");
+             } 
 
              DockerClientConfig.DockerClientConfigBuilder config = DockerClientConfig
                  .createDefaultConfigBuilder()
@@ -449,8 +449,8 @@ public class DockerCloud extends Cloud {
  
              DockerClient dc = DockerClientBuilder.getInstance(config.build()).build();
              Version v = dc.versionCmd().exec();
-             
-             return FormValidation.ok("Version = " + v.getVersion());
+           
+             return FormValidation.ok("Connection successful. Version: " + v.getVersion());
         }
 
         public ListBoxModel doFillCredentialsIdItems(@AncestorInPath ItemGroup context) {
