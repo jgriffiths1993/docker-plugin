@@ -436,9 +436,14 @@ public class DockerCloud extends Cloud {
                  return FormValidation.error("Error: No URL specified.");
              } 
 
-             DockerClientConfig.DockerClientConfigBuilder config = DockerClientConfig
+             DockerClientConfig.DockerClientConfigBuilder config = null;
+             try {
+             config = DockerClientConfig
                  .createDefaultConfigBuilder()
                  .withUri(serverUrl);
+             } catch (IllegalArgumentException ex) {
+                 return FormValidation.error("Error: Invalid URL: " + serverUrl);
+             }
  
              // Use a version if specified
              if( !Strings.isNullOrEmpty(version) ) {
