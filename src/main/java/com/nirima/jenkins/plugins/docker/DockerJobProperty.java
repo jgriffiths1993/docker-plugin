@@ -162,8 +162,9 @@ public class DockerJobProperty extends hudson.model.JobProperty<AbstractProject<
                 // registry = "docker.io";
             // Contains registry/repository or namespace/repository
             } else if(nameParts.length == 2) {
-                if(nameParts[0].contains("[:.]") || 
-                        nameParts[0].equals("localhost")){
+                if(nameParts[0].contains(":") ||
+                   nameParts[0].contains(".") ||
+                   nameParts[0].equals("localhost")){
                     // registry/repository
                     registry = nameParts[0];
                     // namespace = "library";
@@ -229,7 +230,7 @@ public class DockerJobProperty extends hudson.model.JobProperty<AbstractProject<
             
             Pattern repositoryRegexp = Pattern.compile("^([a-z0-9-_.]+)$");
             if(!repositoryRegexp.matcher(repository).matches()) {
-                return FormValidation.error("Invalid registry name");
+                return FormValidation.error("Invalid repository name");
             }
             
             if(registry != null) {
