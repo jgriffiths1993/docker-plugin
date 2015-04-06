@@ -456,7 +456,9 @@ public class DockerCloud extends Cloud {
  
              addCredentials(config, credentialsId);
  
-             DockerClient dc = DockerClientBuilder.getInstance(config.build()).build();
+             DockerClient dc = DockerClientBuilder.getInstance(config.build())
+                 .withDockerCmdExecFactory(new DockerCmdExecFactoryImpl())
+                 .build();
 
              Version v = dc.versionCmd().exec();
            
