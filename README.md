@@ -1,5 +1,7 @@
-docker-plugin
+Jenkins OV Docker Plugin
 =============
+
+Fork of the publicly available docker-plugin
 
 Jenkins Cloud Plugin for Docker
 

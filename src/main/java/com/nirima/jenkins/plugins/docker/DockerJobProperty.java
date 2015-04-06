@@ -13,7 +13,7 @@ import org.kohsuke.stapler.DataBoundConstructor;
 import org.kohsuke.stapler.StaplerRequest;
 import org.kohsuke.stapler.export.Exported;
 import java.util.Map;
-import shaded.com.google.common.base.Strings;
+import com.google.common.base.Strings;
 
 
 public class DockerJobProperty extends hudson.model.JobProperty<AbstractProject<?, ?>> {
@@ -22,7 +22,6 @@ public class DockerJobProperty extends hudson.model.JobProperty<AbstractProject<
      * Tag on completion (commit).
      */
     public final boolean tagOnCompletion;
-    public final boolean pushOnSuccess;
     public final boolean cleanImages;
 
     /**

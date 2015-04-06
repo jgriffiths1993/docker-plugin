@@ -1,5 +1,8 @@
-<project xmlns="http://maven.apache.org/POM/4.0.0" xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
-         xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+<project 
+    xmlns="http://maven.apache.org/POM/4.0.0" 
+    xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+    xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+    
     <modelVersion>4.0.0</modelVersion>
     <parent>
         <groupId>org.jenkins-ci.plugins</groupId>
@@ -8,10 +11,10 @@
     </parent>
 
     <groupId>com.nirima</groupId>
-    <artifactId>docker-plugin-parent</artifactId>
-    <version>0.9.0-SNAPSHOT</version>
-    <packaging>pom</packaging>
-    <name>Docker plugin parent pom</name>
+    <artifactId>docker-plugin</artifactId>
+    <version>0.9.1-SNAPSHOT</version>
+    <packaging>hpi</packaging>
+    <name>Docker plugin</name>
 
     <url>http://wiki.jenkins-ci.org/display/JENKINS/Docker+Plugin</url>
 
@@ -27,20 +30,115 @@
         <stapler.version>1.207</stapler.version>
         <jclouds.version>1.8.1</jclouds.version>
         <guava.version>18.0</guava.version>
-        <docker-java.version>1.0.1-SNAPSHOT</docker-java.version>
-        <jenkins.parent.version>${project.parent.version}</jenkins.parent.version>
+        <docker-java.version>1.1.1-SNAPSHOT</docker-java.version>
         <jdk.debug>true</jdk.debug>
         <jdk.optimize>false</jdk.optimize>
         <jdk.source>1.7</jdk.source>
         <jdk.target>1.7</jdk.target>
     </properties>
 
-    <modules>
-        <module>docker-plugin</module>
-        <module>docker-java-shaded</module>
-    </modules>
+    <dependencies>
+        <dependency>
+            <groupId>com.google.guava</groupId>
+            <artifactId>guava</artifactId>
+            <version>${guava.version}</version>
+        </dependency>
+        <dependency>
+            <groupId>com.github.docker-java</groupId>
+            <artifactId>docker-java</artifactId>
+            <version>${docker-java.version}</version>            
+        </dependency>
+        <dependency>
+            <groupId>org.jenkins-ci.plugins</groupId>
+            <artifactId>ssh-slaves</artifactId>
+            <version>1.6</version>
+        </dependency>
+        <dependency>
+            <groupId>org.jenkins-ci.plugins</groupId>
+            <artifactId>token-macro</artifactId>
+            <version>1.7</version>
+            <optional>true</optional>
+        </dependency>
+        <dependency>
+            <groupId>org.jenkins-ci.plugins</groupId>
+            <artifactId>durable-task</artifactId>
+            <version>0.5</version>
+        </dependency>
+        <dependency>
+            <groupId>org.apache.httpcomponents</groupId>
+            <artifactId>httpclient</artifactId>
+            <version>4.3.6</version>
+        </dependency>
+    </dependencies>
 
     <build>
+        <plugins>
+            <plugin>
+                <artifactId>maven-shade-plugin</artifactId>
+                <version>2.3</version>
+                <configuration>
+                    <artifactSet>
+                        <includes>
+                            <include>com.github.docker-java:*</include>
+                            <include>com.google.guava:*</include>
+                        </includes>
+                    </artifactSet>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.jenkins-ci.tools</groupId>
+                <artifactId>maven-hpi-plugin</artifactId>
+                <version>${hpi.plugin.version}</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>com.google.guava</groupId>
+                        <artifactId>guava</artifactId>
+                        <version>${guava.version}</version>
+                    </dependency>  
+                    <dependency>
+                        <groupId>org.kohsuke.stapler</groupId>
+                        <artifactId>stapler</artifactId>
+                        <version>${stapler.version}</version>
+                    </dependency>               
+                </dependencies>
+                <configuration>
+                    <dependentWarExcludes>org.apache.httpcomponents:*,com.github.docker-java*,com.google.guava*</dependentWarExcludes>
+                    <archive>
+                        <manifestEntries>
+                            <Mask-Classes>com.google.common</Mask-Classes>
+                        </manifestEntries>
+                    </archive>
+                    <maskClasses>com.google.common.</maskClasses>
+                </configuration>
+            </plugin>
+
+            <plugin>
+                <groupId>org.codehaus.mojo</groupId>
+                <artifactId>build-helper-maven-plugin</artifactId>
+                <version>1.7</version>
+                <executions>
+                    <execution>
+                        <id>add-eclipse-sources</id>
+                        <phase>generate-sources</phase>
+                        <goals>
+                            <goal>add-source</goal>
+                        </goals>
+                        <configuration>
+                            <sources>
+                                <source>${basedir}/target/generated-sources/localizer</source>
+                            </sources>
+                        </configuration>
+                    </execution>
+                </executions>
+            </plugin>
+            <plugin>
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-release-plugin</artifactId>
+                <version>2.5</version>
+            </plugin>
+        </plugins>
+
         <pluginManagement>
             <plugins>
                 <plugin>
@@ -83,14 +181,16 @@
             </plugins>
         </pluginManagement>
         <finalName>${project.artifactId}</finalName>
-        <plugins>
-        </plugins>
     </build>
 
     <repositories>
         <repository>
             <id>repo.jenkins-ci.org</id>
             <url>http://repo.jenkins-ci.org/public/</url>
+        </repository>
+        <repository>
+            <id>Sonatype</id>
+            <url>https://oss.sonatype.org/content/groups/public</url>
         </repository>
     </repositories>
 
@@ -107,5 +207,4 @@
             <url>http://maven.jenkins-ci.org:8081/content/repositories/releases/</url>
         </repository>
     </distributionManagement>
-
 </project>
