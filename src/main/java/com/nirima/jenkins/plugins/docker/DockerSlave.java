@@ -102,12 +102,12 @@ public class DockerSlave extends AbstractCloudSlave {
             // Stop container if "remainsRunning" isn't ticked.
             if(!getJobProperty().isRemainsRunning()) {
                 DockerClient client = getClient();
-                LOGGER.log(Level.INFO, "Stopping container: " + containerId);
+                LOGGER.log(Level.INFO, "Stopping container: {0}", containerId);
                 try {
                     client.stopContainerCmd(containerId).exec();
-                    LOGGER.log(Level.INFO, "Successfully stopped container: " + containerId);
+                    LOGGER.log(Level.INFO, "Successfully stopped container: {0}", containerId);
                 } catch(NotModifiedException ex) {
-                    LOGGER.log(Level.INFO, "Container " + containerId + " already not running");
+                    LOGGER.log(Level.INFO, "Container {0} already not running", containerId);
                 } 
             }
 
@@ -231,23 +231,7 @@ public class DockerSlave extends AbstractCloudSlave {
         return imageTag.replaceAll("\\s", "_")
                        .replaceAll("[^A-Za-z0-9_.-]", "");
     }
-
-    private String getAdditionalTag(TaskListener listener) {
-        // Do a macro expansion on the addJenkinsAction token
-
-        // Job property
-        String tagToken = getJobProperty().additionalTag;
-
-        // Do any macro expansions
-        try {
-            if(!Strings.isNullOrEmpty(tagToken))
-                tagToken = TokenMacro.expandAll((AbstractBuild) theRun, listener, tagToken);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
-        return tagToken;
-    }
-
+    
     /**
      * Add a built on docker action.
      * @param tag_image
