@@ -28,7 +28,6 @@
     <properties>
         <hpi.plugin.version>1.112</hpi.plugin.version>
         <stapler.version>1.207</stapler.version>
-        <jclouds.version>1.8.1</jclouds.version>
         <guava.version>18.0</guava.version>
         <docker-java.version>1.1.1-SNAPSHOT</docker-java.version>
         <jdk.debug>true</jdk.debug>
@@ -73,6 +72,7 @@
 
     <build>
         <plugins>
+            <!--
             <plugin>
                 <artifactId>maven-shade-plugin</artifactId>
                 <version>2.3</version>
@@ -85,6 +85,7 @@
                     </artifactSet>
                 </configuration>
             </plugin>
+            -->
 
             <plugin>
                 <groupId>org.jenkins-ci.tools</groupId>
@@ -95,12 +96,12 @@
                         <groupId>com.google.guava</groupId>
                         <artifactId>guava</artifactId>
                         <version>${guava.version}</version>
-                    </dependency>  
+                    </dependency>
                     <dependency>
                         <groupId>org.kohsuke.stapler</groupId>
                         <artifactId>stapler</artifactId>
                         <version>${stapler.version}</version>
-                    </dependency>               
+                    </dependency>
                 </dependencies>
                 <configuration>
                     <dependentWarExcludes>org.apache.httpcomponents:*,com.github.docker-java*,com.google.guava*</dependentWarExcludes>
@@ -112,7 +113,6 @@
                     <maskClasses>com.google.common.</maskClasses>
                 </configuration>
             </plugin>
-
             <plugin>
                 <groupId>org.codehaus.mojo</groupId>
                 <artifactId>build-helper-maven-plugin</artifactId>
@@ -132,54 +132,21 @@
                     </execution>
                 </executions>
             </plugin>
+
             <plugin>
                 <groupId>org.apache.maven.plugins</groupId>
                 <artifactId>maven-release-plugin</artifactId>
-                <version>2.5</version>
+                <version>${maven-compiler-plugin.version}</version>
+                <configuration>
+                    <source>${jdk.source}</source>
+                    <target>${jdk.target}</target>
+                    <debug>${jdk.debug}</debug>
+                    <optimize>${jdk.optimize}</optimize>
+                </configuration>
             </plugin>
+
         </plugins>
 
-        <pluginManagement>
-            <plugins>
-                <plugin>
-                    <groupId>org.apache.maven.plugins</groupId>
-                    <artifactId>maven-compiler-plugin</artifactId>
-                    <version>${maven-compiler-plugin.version}</version>
-                    <configuration>
-                        <source>${jdk.source}</source>
-                        <target>${jdk.target}</target>
-                        <debug>${jdk.debug}</debug>
-                        <optimize>${jdk.optimize}</optimize>
-                    </configuration>
-                </plugin>
-                <plugin>
-                    <groupId>org.jenkins-ci.tools</groupId>
-                    <artifactId>maven-hpi-plugin</artifactId>
-                    <version>${hpi.plugin.version}</version>
-                    <dependencies>
-                        <dependency>
-                            <groupId>com.google.guava</groupId>
-                            <artifactId>guava</artifactId>
-                            <version>${guava.version}</version>
-                        </dependency>
-                        <dependency>
-                            <groupId>org.kohsuke.stapler</groupId>
-                            <artifactId>stapler</artifactId>
-                            <version>${stapler.version}</version>
-                        </dependency>
-                    </dependencies>
-                    <configuration>
-                        <dependentWarExcludes>com.github.dockerjava*,com.google.guava*</dependentWarExcludes>
-                        <archive>
-                            <manifestEntries>
-                                <Mask-Classes>com.google.common</Mask-Classes>
-                            </manifestEntries>
-                        </archive>
-                        <maskClasses>com.google.common.</maskClasses>
-                    </configuration>
-                </plugin>
-            </plugins>
-        </pluginManagement>
         <finalName>${project.artifactId}</finalName>
     </build>
 
