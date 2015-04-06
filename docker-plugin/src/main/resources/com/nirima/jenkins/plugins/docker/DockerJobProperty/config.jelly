@@ -27,10 +27,6 @@
             <f:textbox />
         </f:entry>
 
-        <f:entry title="${%Push on successful build}" field="pushOnSuccess">
-            <f:checkbox/>
-        </f:entry>
-
         <f:entry title="${%Image Author}" field="imageAuthor">
             <f:textbox />
         </f:entry>
@@ -38,11 +34,6 @@
         <f:entry title="${%Clean local images}" field="cleanImages">
             <f:checkbox />
         </f:entry>
-<!--
-        <f:entry title="${%Remove untagged images}" field="removeUntaggedImages">
-            <f:checkbox default="true" />
-        </f:entry>
--->
 
     </f:section>
 

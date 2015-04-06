@@ -203,18 +203,6 @@ public class DockerSlave extends AbstractCloudSlave {
             } catch(Exception ex) {
                 LOGGER.log(Level.SEVERE, "Could not add tag: " + cleanTag, ex);
             }
-
-            // Push the image to the registry with all of the tags
-            if(getJobProperty().isPushOnSuccess()) {
-                try {
-                    client.pushImageCmd(repositoryName)
-                        .withTag(cleanTag)
-                        .exec();
-                } catch (NotFoundException ex) {
-                    // This should NEVER happen but just in case.
-                    LOGGER.log(Level.SEVERE, "Couldnt find " + repositoryName + ":" +cleanTag + ". Not pushing.");
-                }
-            }
         }
 
         // Add a Jenkins 'Action' for the newly committed image
@@ -307,7 +295,7 @@ public class DockerSlave extends AbstractCloudSlave {
             // Don't care.
         }
         // Safe default
-        return new DockerJobProperty(false, false, true, false, null, false, false, null, null);
+        return new DockerJobProperty(false, false, false, null, false, false, null, null);
 
     }
 

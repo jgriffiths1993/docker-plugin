@@ -64,7 +64,6 @@ public class DockerJobProperty extends hudson.model.JobProperty<AbstractProject<
     @DataBoundConstructor
     public DockerJobProperty(
             boolean tagOnCompletion, 
-            boolean pushOnSuccess, 
             boolean cleanImages,
             boolean remainsRunning,
             String imageAuthor,
@@ -75,7 +74,6 @@ public class DockerJobProperty extends hudson.model.JobProperty<AbstractProject<
     {
         this.additionalTag = "";
         this.tagOnCompletion = tagOnCompletion;
-        this.pushOnSuccess = pushOnSuccess;
         this.cleanImages = cleanImages;
         this.remainsRunning = remainsRunning;
         this.imageAuthor = imageAuthor;
@@ -88,7 +86,7 @@ public class DockerJobProperty extends hudson.model.JobProperty<AbstractProject<
 
     @Exported
     public boolean isPushOnSuccess() {
-        return pushOnSuccess;
+        return false;
     }
 
     @Exported
@@ -156,7 +154,6 @@ public class DockerJobProperty extends hudson.model.JobProperty<AbstractProject<
 
             return new DockerJobProperty(
                     (Boolean)formData.get("tagOnCompletion"),
-                    (Boolean)formData.get("pushOnSuccess"),
                     (Boolean)formData.get("cleanImages"),
                     (Boolean)formData.get("remainsRunning"),
                     (String)formData.get("imageAuthor"),
