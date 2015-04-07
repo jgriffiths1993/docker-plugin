@@ -3,13 +3,11 @@ package com.nirima.jenkins.plugins.docker;
 import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
-
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.DockerException;
 import com.github.dockerjava.api.NotModifiedException;
 import com.github.dockerjava.api.NotFoundException;
 import com.nirima.jenkins.plugins.docker.action.DockerBuildAction;
-
 import hudson.Extension;
 import hudson.model.*;
 import hudson.model.queue.CauseOfBlockage;
@@ -38,8 +36,31 @@ public class DockerSlave extends AbstractCloudSlave {
     private transient Run theRun;
 
     @DataBoundConstructor
-    public DockerSlave(DockerTemplate dockerTemplate, String containerId, String name, String nodeDescription, String remoteFS, int numExecutors, Mode mode, Integer memoryLimit, Integer cpuShares, String labelString, ComputerLauncher launcher, RetentionStrategy retentionStrategy, List<? extends NodeProperty<?>> nodeProperties) throws Descriptor.FormException, IOException {
-        super(name, nodeDescription, remoteFS, numExecutors, mode, labelString, launcher, retentionStrategy, nodeProperties);
+    public DockerSlave(
+            DockerTemplate dockerTemplate, 
+            String containerId, 
+            String name, 
+            String nodeDescription, 
+            String remoteFS, 
+            int numExecutors, 
+            Mode mode, 
+            Integer memoryLimit, 
+            Integer cpuShares, 
+            String labelString, 
+            ComputerLauncher launcher, 
+            RetentionStrategy retentionStrategy, 
+            List<? extends NodeProperty<?>> nodeProperties) 
+            throws Descriptor.FormException, IOException {
+        super(  name, 
+                nodeDescription, 
+                remoteFS, 
+                numExecutors, 
+                mode, 
+                labelString, 
+                launcher, 
+                retentionStrategy, 
+                nodeProperties
+        );
         Preconditions.checkNotNull(dockerTemplate);
         Preconditions.checkNotNull(containerId);
 
@@ -49,11 +70,11 @@ public class DockerSlave extends AbstractCloudSlave {
 
     public DockerCloud getCloud() {
         DockerCloud theCloud = dockerTemplate.getParent();
-
         if(theCloud == null) {
-            throw new RuntimeException("Docker template " + dockerTemplate + " has no parent ");
+            throw new RuntimeException(
+                    "Docker template " + dockerTemplate + " has no parent "
+            );
         }
-
         return theCloud;
     }
 
@@ -93,6 +114,9 @@ public class DockerSlave extends AbstractCloudSlave {
         }
     }
     
+    /**
+     * Stops running container without force.
+     */
     private void stopContainer() {
         DockerClient client = getClient();
         LOGGER.log(Level.INFO, "Stopping container: {0}", containerId);
@@ -110,56 +134,70 @@ public class DockerSlave extends AbstractCloudSlave {
             );
         }
     }
-
+    
+    /**
+     * Removes (Deletes) slave container without force.
+     */
+    private void removeContainer() {
+        DockerClient client = getClient();
+        try {
+            client.removeContainerCmd(containerId).exec();
+        } catch (NotFoundException ex) {
+            LOGGER.log(Level.SEVERE, 
+                    "Failed to remove container: {0}. Doesn't exist.", 
+                    containerId
+            );
+        }
+    }
+    
+    /**
+     * Takes the Jenkins slave offline
+     * TODO: Add handling for returned future<> object to check the status
+     * of the action.
+     */
+    private void disconnectSlave() {
+        toComputer().disconnect(null);
+    }
+    
+    /**
+     * Returns whether build is successful.
+     */
+    private boolean isSuccessfulBuild() {
+        if(theRun == null) {
+            return false;
+        }
+        Result result = theRun.getResult();
+        return result != null && result == Result.SUCCESS;
+    }
+    
     @Override
     protected void _terminate(TaskListener listener) 
             throws IOException, InterruptedException {
-
-        try {
-            // Disconnect slave from Jenkins
-            toComputer().disconnect(null);
-
-            // Stop container if "remainsRunning" isn't ticked.
-            if(!getJobProperty().isRemainsRunning()) {
-                stopContainer(); 
-            }
-
-            // If the run was OK, then do any tagging here
-            // TODO: add options to tag unsuccessful builds
-            if(theRun != null) {
-                try {
-                    slaveShutdown(listener);
-                } catch (Exception e) {
-                    LOGGER.log(Level.SEVERE, "Failure to slaveShutdown instance " + containerId+ " for slave " + name , e);
-                }
-            }
-
-            // If we aren't stopping the container, then don't remove it either.
-            if(!getJobProperty().isRemainsRunning()) {
-                try {
-                    DockerClient client = getClient();
-                    client.removeContainerCmd(containerId).exec();
-                } catch(Exception ex) {
-                    LOGGER.log(Level.SEVERE, "Failed to remove instance " + containerId + " for slave " + name + " due to exception",ex);
-                }
-            }
-
-        } catch (Exception e) {
-            LOGGER.log(Level.SEVERE, "Failure to terminate instance " + containerId + " for slave " + name ,e);
-        }
-    }
-
-    private void slaveShutdown(TaskListener listener) throws DockerException, IOException {
-
-        String imageId = null;
-        if(getJobProperty().isTagOnCompletion()) {
-            imageId = commitContainer();
-        }
-        addJenkinsAction(imageId);
         
-
-        if(getJobProperty().isCleanImages() && imageId != null) {
-            cleanImages(imageId);
+        // Disconnect slave from Jenkins
+        // Track disconnection status
+        // Stop container unless remainsRunning
+        // Check if we have a 'theRun' and analyse it... appropriately...
+        
+        // Disconnects Jenkins slave.
+        disconnectSlave();
+        if(!getJobProperty().isRemainsRunning()) {
+            stopContainer(); 
+        }
+        
+        if(theRun != null) {
+            String imageId = null;
+            if(getJobProperty().isTagOnCompletion()) {
+                imageId = commitContainer();
+            }
+            addJenkinsAction(imageId);
+            if(getJobProperty().isCleanImages() && imageId != null) {
+                cleanImages(imageId);
+            }    
+        }
+        
+        if(!getJobProperty().isRemainsRunning()) {
+            removeContainer();
         }
     }
     
@@ -180,25 +218,22 @@ public class DockerSlave extends AbstractCloudSlave {
         } else {
             repositoryName = getJobProperty().getRepositoryName();
         }
-        
         LOGGER.log(Level.INFO, "Tagging with repository: {0}", repositoryName);
-
         // Get our list of tags, or use the build number
         ArrayList<String> imageTags = new ArrayList<String>(
-                Arrays.asList(
-                    getJobProperty().getImageTags().split("[,;:]")
-                    ));
-        
+                Arrays.asList(getJobProperty()
+                                .getImageTags()
+                                .split("[,;:]")
+                )
+        );
         // Tag latest if specified
         if(getJobProperty().isTagLatest()) {
             imageTags.add("latest");
         }
-
         // If there's no tags, or if specified, tag with the build number
         if(imageTags.isEmpty() || getJobProperty().isTagBuildNumber()) {
             imageTags.add(getBuildNumber());
         }
-
         // Commit image and get new image ID
         String imageId = client.commitCmd(containerId)
                     .withAuthor(getJobProperty().getImageAuthor())
@@ -212,7 +247,6 @@ public class DockerSlave extends AbstractCloudSlave {
                 continue;
             }
             LOGGER.log(Level.INFO, "Tagging with: {0}", tag);
-
             // Tag the image!
             try {
                 client.tagImageCmd(imageId, repositoryName, tag)
@@ -280,33 +314,43 @@ public class DockerSlave extends AbstractCloudSlave {
                 .toString();
     }
 
+    /**
+     * Returns DockerJobProperty object for build, or a safe default
+     * if we can't find one.
+     */
     private DockerJobProperty getJobProperty() {
-
         try {
-            DockerJobProperty p = (DockerJobProperty) ((AbstractBuild) theRun).getProject().getProperty(DockerJobProperty.class);
-
-            if (p != null)
+            DockerJobProperty p = (DockerJobProperty) ((AbstractBuild) theRun)
+                    .getProject()
+                    .getProperty(DockerJobProperty.class);
+            if (p != null) {
                 return p;
+            }
         } catch(Exception ex) {
             // Don't care.
         }
         // Safe default
-        return new DockerJobProperty(false, false, false, null, false, false, null, null);
-
+        return new DockerJobProperty(
+                false, 
+                false, 
+                false, 
+                null, 
+                false, 
+                false, 
+                null, 
+                null
+        );
     }
 
     @Extension
-	public static final class DescriptorImpl extends SlaveDescriptor {
-
-    	@Override
-		public String getDisplayName() {
-			return "Docker Slave";
+    public static final class DescriptorImpl extends SlaveDescriptor {
+        @Override
+        public String getDisplayName() {
+            return "Docker Slave";
     	};
-
-		@Override
-		public boolean isInstantiable() {
-			return false;
-		}
-
-	}
+        @Override
+        public boolean isInstantiable() {
+            return false;
+        }
+    }
 }
