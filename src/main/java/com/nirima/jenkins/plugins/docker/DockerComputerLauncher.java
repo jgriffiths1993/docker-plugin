@@ -26,28 +26,20 @@ public class DockerComputerLauncher extends DelegatingComputerLauncher {
             DockerComputerLauncher.class.getName()
     );
 
-    public DockerComputerLauncher(
-            DockerTemplate template, 
-            InspectContainerResponse containerInspectResponse) {
+    public DockerComputerLauncher(DockerTemplate template, InspectContainerResponse containerInspectResponse) {
         super(makeLauncher(template, containerInspectResponse));
     }
 
     private static ComputerLauncher makeLauncher(
             DockerTemplate template, 
             InspectContainerResponse containerInspectResponse) {
-        SSHLauncher sshLauncher = getSSHLauncher(
-                containerInspectResponse, 
-                template
-        );
+        SSHLauncher sshLauncher = getSSHLauncher(containerInspectResponse, template);
         return new RetryingComputerLauncher(sshLauncher);
     }
 
-    private static SSHLauncher getSSHLauncher(
-            InspectContainerResponse detail, 
-            DockerTemplate template)   {
+    private static SSHLauncher getSSHLauncher(InspectContainerResponse detail, DockerTemplate template) {
         Preconditions.checkNotNull(template);
         Preconditions.checkNotNull(detail);
-
         try {
             ExposedPort sshPort = new ExposedPort(22);
             int port = 22;
@@ -58,25 +50,21 @@ public class DockerComputerLauncher extends DelegatingComputerLauncher {
                     .getBindings()
                     .get(sshPort);
             
-            for(Ports.Binding b : bindings) {
+            for( Ports.Binding b : bindings ) {
                 port = b.getHostPort();
                 host = b.getHostIp();
             }
 
             // Don't try and SSH to `null` or `0.0.0.0`
-            if(host == null || host.equals("0.0.0.0")) {
+            if( host == null || host.equals("0.0.0.0") ) {
                 URL hostUrl = new URL(template.getParent().serverUrl);
                 host = hostUrl.getHost();
             }
 
-            LOGGER.log(Level.INFO, 
-                    "Creating slave SSH launcher for {0}:{1}", 
-                    new Object[]{host, port}
-            );
+            LOGGER.log(Level.INFO, "Creating slave SSH launcher for {0}:{1}", new Object[]{host, port});
             
             PortUtils.waitForPort(host, port);
-            StandardUsernameCredentials credentials = 
-                    SSHLauncher.lookupSystemCredentials(template.credentialsId);
+            StandardUsernameCredentials credentials = SSHLauncher.lookupSystemCredentials(template.credentialsId);
             
             return new SSHLauncher(
                     host, 
@@ -88,9 +76,8 @@ public class DockerComputerLauncher extends DelegatingComputerLauncher {
                     template.suffixStartSlaveCmd, 
                     template.getSSHLaunchTimeoutMinutes() * 60
             );
-
         } catch(NullPointerException ex) {
-            throw new RuntimeException("No mapped port 22 in host for SSL. Config=" + detail);
+            throw new RuntimeException("No mapped port 22 in host for SSL. Config: " + detail);
         } catch (MalformedURLException e) {
             throw new RuntimeException("Malformed URL for host " + template);
         }
