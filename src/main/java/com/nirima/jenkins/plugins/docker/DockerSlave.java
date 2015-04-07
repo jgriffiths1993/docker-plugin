@@ -4,7 +4,6 @@ import com.google.common.base.Objects;
 import com.google.common.base.Preconditions;
 import com.google.common.base.Strings;
 import com.github.dockerjava.api.DockerClient;
-import com.github.dockerjava.api.DockerException;
 import com.github.dockerjava.api.NotModifiedException;
 import com.github.dockerjava.api.NotFoundException;
 import com.nirima.jenkins.plugins.docker.action.DockerBuildAction;
@@ -20,6 +19,8 @@ import java.io.IOException;
 import java.util.List;
 import java.util.ArrayList;
 import java.util.Arrays;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -71,9 +72,7 @@ public class DockerSlave extends AbstractCloudSlave {
     public DockerCloud getCloud() {
         DockerCloud theCloud = dockerTemplate.getParent();
         if(theCloud == null) {
-            throw new RuntimeException(
-                    "Docker template " + dockerTemplate + " has no parent "
-            );
+            throw new RuntimeException("Docker template " + dockerTemplate + " has no parent ");
         }
         return theCloud;
     }
@@ -155,8 +154,12 @@ public class DockerSlave extends AbstractCloudSlave {
      * TODO: Add handling for returned future<> object to check the status
      * of the action.
      */
-    private void disconnectSlave() {
-        toComputer().disconnect(null);
+    private Future<?> disconnectSlave() {
+        Computer slaveComputer = toComputer();
+        if( slaveComputer != null ){
+            return slaveComputer.disconnect();
+        }
+        throw new RuntimeException("Could not get slave computer to disconnect");
     }
     
     /**
@@ -180,7 +183,7 @@ public class DockerSlave extends AbstractCloudSlave {
         // Check if we have a 'theRun' and analyse it... appropriately...
         
         // Disconnects Jenkins slave.
-        disconnectSlave();
+        Future<?> slaveDisconnection = disconnectSlave();
         if(!getJobProperty().isRemainsRunning()) {
             stopContainer(); 
         }
@@ -195,10 +198,19 @@ public class DockerSlave extends AbstractCloudSlave {
                 cleanImages(imageId);
             }    
         }
-        
         if(!getJobProperty().isRemainsRunning()) {
             removeContainer();
         }
+        
+        // Wait for slave disconnection to complete.
+        try {
+            slaveDisconnection.get();
+        } catch (ExecutionException ex) {
+            LOGGER.log(Level.SEVERE, "Failed to disconnect slave: {0}", containerId);
+        }
+        LOGGER.log(Level.INFO, "Container {0} disconnected? {1}", 
+                new Object[]{containerId, slaveDisconnection.isDone()}
+        );
     }
     
     private void cleanImages(String imageId) {
