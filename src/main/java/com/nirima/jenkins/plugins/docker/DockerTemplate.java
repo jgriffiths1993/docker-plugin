@@ -49,7 +49,10 @@ public class DockerTemplate extends DockerTemplateBase implements Describable<Do
     private static final Logger LOGGER = Logger.getLogger(DockerTemplate.class.getName());
 
 
-    public final String labelString;
+    /**
+     * List of labels, NOT final as we'll append the container ID
+     */
+    public String labelString;
 
     // SSH settings
     /**
@@ -118,13 +121,23 @@ public class DockerTemplate extends DockerTemplateBase implements Describable<Do
                           String bindPorts,
                           boolean bindAllPorts,
                           boolean privileged,
-                          boolean tty
-
-    ) {
-        super(image, dnsString,dockerCommand,volumesString,volumesFrom,environmentsString,lxcConfString,hostname, memoryLimit, cpuShares,
-                Objects.firstNonNull(bindPorts, "0.0.0.0:22"), bindAllPorts,
-                privileged, tty);
-
+                          boolean tty ) {
+        super(
+                image, 
+                dnsString,
+                dockerCommand,
+                volumesString,
+                volumesFrom,
+                environmentsString,
+                lxcConfString,
+                hostname, 
+                memoryLimit, 
+                cpuShares,
+                Objects.firstNonNull(bindPorts, "0.0.0.0:22"), 
+                bindAllPorts,
+                privileged, 
+                tty
+        );
 
         this.labelString = Util.fixNull(labelString);
         this.credentialsId = credentialsId;
@@ -134,15 +147,18 @@ public class DockerTemplate extends DockerTemplateBase implements Describable<Do
         this.javaPath = javaPath;
         this.prefixStartSlaveCmd = prefixStartSlaveCmd;
         this.suffixStartSlaveCmd = suffixStartSlaveCmd;
-        this.remoteFs =  Strings.isNullOrEmpty(remoteFs)?"/home/jenkins":remoteFs;
+        if(Strings.isNullOrEmpty(remoteFs)){
+            this.remoteFs = "/home/jenkins";
+        } else {
+            this.remoteFs = remoteFs;
+        }
         this.remoteFsMapping = remoteFsMapping;
 
-        if (instanceCapStr.equals("")) {
+        if (Strings.isNullOrEmpty(instanceCapStr)) {
             this.instanceCap = Integer.MAX_VALUE;
         } else {
             this.instanceCap = Integer.parseInt(instanceCapStr);
         }
-
         readResolve();
     }
 
@@ -154,20 +170,27 @@ public class DockerTemplate extends DockerTemplateBase implements Describable<Do
         }
     }
 
+    @Override
     public String getDnsString() {
         return Joiner.on(" ").join(dnsHosts);
     }
 
+    @Override
     public String getVolumesString() {
 	return Joiner.on(" ").join(volumes);
     }
 
+    @Override
     public String getVolumesFrom() {
         return volumesFrom;
     }
 
     public String getRemoteFsMapping() {
         return remoteFsMapping;
+    }
+    
+    public int getNumExecutors() {
+        return 1;
     }
 
     public Descriptor<DockerTemplate> getDescriptor() {
@@ -191,15 +214,18 @@ public class DockerTemplate extends DockerTemplateBase implements Describable<Do
         }
     }
     /**
-     * Initializes data structure that we don't persist.
+     * Initialises data structure that we don't persist.
+     * @return 
      */
+    @Override
     protected Object readResolve() {
         super.readResolve();
 
         labelSet = Label.parse(labelString);
         return this;
     }
-
+    
+    @Override
     public String getDisplayName() {
         return "Image of " + image;
     }
@@ -209,71 +235,86 @@ public class DockerTemplate extends DockerTemplateBase implements Describable<Do
     }
 
     public int idleTerminationMinutes() {
-        if (idleTerminationMinutes == null || idleTerminationMinutes.trim().isEmpty()) {
+        if (idleTerminationMinutes == null 
+                || idleTerminationMinutes.trim().isEmpty()) {
             return 0;
         } else {
             try {
                 return Integer.parseInt(idleTerminationMinutes);
             } catch (NumberFormatException nfe) {
-                LOGGER.log(Level.INFO, "Malformed idleTermination value: {0}", idleTerminationMinutes);
+                LOGGER.log(Level.INFO, 
+                        "Malformed idleTermination value: {0}", 
+                        idleTerminationMinutes
+                );
                 return 30;
             }
         }
     }
 
-    public DockerSlave provision(StreamTaskListener listener) throws IOException, Descriptor.FormException, DockerException {
-            PrintStream logger = listener.getLogger();
-
-
+    public DockerSlave provision(StreamTaskListener listener) 
+            throws IOException, Descriptor.FormException, DockerException {
+        
+        PrintStream logger = listener.getLogger();
+        
         logger.println("Launching " + image );
 
-        int numExecutors = 1;
+        int numExecutors = getNumExecutors();
+        
         Node.Mode mode = Node.Mode.NORMAL;
-
-        RetentionStrategy retentionStrategy = new OnceRetentionStrategy(idleTerminationMinutes());
+        
+        RetentionStrategy retentionStrategy = 
+                new OnceRetentionStrategy(idleTerminationMinutes());
 
         List<? extends NodeProperty<?>> nodeProperties = new ArrayList();
 
         InspectContainerResponse containerInspectResponse = provisionNew();
         String containerId = containerInspectResponse.getId();
 
-        ComputerLauncher launcher = new DockerComputerLauncher(this, containerInspectResponse);
+        ComputerLauncher launcher = new DockerComputerLauncher(
+                this, 
+                containerInspectResponse
+        );
 
         // Build a description up:
         String nodeDescription = "Docker Node [" + image + " on ";
         try {
             nodeDescription += getParent().getDisplayName();
-        } catch(Exception ex)
-        {
-            nodeDescription += "???";
+        } catch(Exception ex) {
+            nodeDescription += "??? ]";
         }
         nodeDescription += "]";
 
         String slaveName = containerId.substring(0,12);
-
-        try
-        {
+        
+        // Add container ID to list of labels
+        labelString += " " + slaveName;
+        
+        try {
             slaveName = slaveName + "@" + getParent().getDisplayName();
-        }
-        catch(Exception ex) {
+        } catch(Exception ex) {
             LOGGER.warning("Error fetching name of cloud");
         }
 
-        return new DockerSlave(this, containerId,
+        return new DockerSlave(
+                this, 
+                containerId,
                 slaveName,
                 nodeDescription,
-                remoteFs, numExecutors, mode, memoryLimit, cpuShares, labelString,
-                launcher, retentionStrategy, nodeProperties);
-
+                remoteFs, 
+                numExecutors, 
+                mode, 
+                memoryLimit, 
+                cpuShares, 
+                labelString,
+                launcher, 
+                retentionStrategy, 
+                nodeProperties
+        );
     }
 
     public InspectContainerResponse provisionNew() throws DockerException {
         DockerClient dockerClient = getParent().connect();
         return provisionNew(dockerClient);
-    }
-
-    public int getNumExecutors() {
-        return 1;
     }
 
     @Override
@@ -284,7 +325,6 @@ public class DockerTemplate extends DockerTemplateBase implements Describable<Do
             //default value to preserve compatibility
             cmd = new String[]{"/usr/sbin/sshd", "-D"};
         }
-
         return cmd;
     }
 
@@ -294,11 +334,10 @@ public class DockerTemplate extends DockerTemplateBase implements Describable<Do
      * to want port 22 exposed.
      */
     public Iterable<PortBinding> getPortMappings() {
-
         if(Strings.isNullOrEmpty(bindPorts) ) {
              return ImmutableList.<PortBinding>builder()
-                .add(PortBinding.parse("0.0.0.0::22"))
-                 .build();
+                     .add(PortBinding.parse("0.0.0.0::22"))
+                     .build();
         }
         return super.getPortMappings();
     }
@@ -311,11 +350,17 @@ public class DockerTemplate extends DockerTemplateBase implements Describable<Do
             return "Docker Template";
         }
 
-        public ListBoxModel doFillCredentialsIdItems(@AncestorInPath ItemGroup context) {
-
-            return new SSHUserListBoxModel().withMatching(SSHAuthenticator.matcher(Connection.class),
-                    CredentialsProvider.lookupCredentials(StandardUsernameCredentials.class, context,
-                            ACL.SYSTEM, SSHLauncher.SSH_SCHEME));
+        public ListBoxModel doFillCredentialsIdItems(
+                @AncestorInPath ItemGroup context) {
+            return new SSHUserListBoxModel().withMatching(
+                    SSHAuthenticator.matcher(Connection.class),
+                    CredentialsProvider.lookupCredentials(
+                            StandardUsernameCredentials.class, 
+                            context,
+                            ACL.SYSTEM, 
+                            SSHLauncher.SSH_SCHEME
+                    )
+            );
         }
     }
 
