@@ -17,7 +17,6 @@ import hudson.slaves.AbstractCloudSlave;
 import hudson.slaves.ComputerLauncher;
 import hudson.slaves.NodeProperty;
 import hudson.slaves.RetentionStrategy;
-import org.jenkinsci.plugins.tokenmacro.TokenMacro;
 import org.kohsuke.stapler.DataBoundConstructor;
 import java.io.IOException;
 import java.util.List;
@@ -29,7 +28,9 @@ import java.util.logging.Logger;
 
 public class DockerSlave extends AbstractCloudSlave {
 
-    private static final Logger LOGGER = Logger.getLogger(DockerSlave.class.getName());
+    private static final Logger LOGGER = Logger.getLogger(
+            DockerSlave.class.getName()
+    );
 
     public final DockerTemplate dockerTemplate;
     public final String containerId;
@@ -49,7 +50,7 @@ public class DockerSlave extends AbstractCloudSlave {
     public DockerCloud getCloud() {
         DockerCloud theCloud = dockerTemplate.getParent();
 
-        if( theCloud == null ) {
+        if(theCloud == null) {
             throw new RuntimeException("Docker template " + dockerTemplate + " has no parent ");
         }
 
@@ -91,24 +92,36 @@ public class DockerSlave extends AbstractCloudSlave {
             return false;
         }
     }
+    
+    private void stopContainer() {
+        DockerClient client = getClient();
+        LOGGER.log(Level.INFO, "Stopping container: {0}", containerId);
+        try {
+            client.stopContainerCmd(containerId).exec();
+        } catch(NotModifiedException ex) {
+            LOGGER.log(Level.INFO, 
+                    "Could not stop container: {0}. Not running.", 
+                    containerId
+            );
+        } catch (NotFoundException ex) {
+            LOGGER.log(Level.INFO,
+                    "Could not stop container: {0}. Doesn't exist.",
+                    containerId
+            );
+        }
+    }
 
     @Override
-    protected void _terminate(TaskListener listener) throws IOException, InterruptedException {
-
+    protected void _terminate(TaskListener listener) 
+            throws IOException, InterruptedException {
 
         try {
+            // Disconnect slave from Jenkins
             toComputer().disconnect(null);
 
             // Stop container if "remainsRunning" isn't ticked.
             if(!getJobProperty().isRemainsRunning()) {
-                DockerClient client = getClient();
-                LOGGER.log(Level.INFO, "Stopping container: {0}", containerId);
-                try {
-                    client.stopContainerCmd(containerId).exec();
-                    LOGGER.log(Level.INFO, "Successfully stopped container: {0}", containerId);
-                } catch(NotModifiedException ex) {
-                    LOGGER.log(Level.INFO, "Container {0} already not running", containerId);
-                } 
+                stopContainer(); 
             }
 
             // If the run was OK, then do any tagging here
@@ -120,7 +133,6 @@ public class DockerSlave extends AbstractCloudSlave {
                     LOGGER.log(Level.SEVERE, "Failure to slaveShutdown instance " + containerId+ " for slave " + name , e);
                 }
             }
-
 
             // If we aren't stopping the container, then don't remove it either.
             if(!getJobProperty().isRemainsRunning()) {
@@ -139,27 +151,37 @@ public class DockerSlave extends AbstractCloudSlave {
 
     private void slaveShutdown(TaskListener listener) throws DockerException, IOException {
 
-        // The slave has stopped. Should we commit / tag / push ?
-        if(!getJobProperty().tagOnCompletion) {
-            addJenkinsAction(null);
-            return;
+        String imageId = null;
+        if(getJobProperty().isTagOnCompletion()) {
+            imageId = commitContainer();
         }
+        addJenkinsAction(imageId);
+        
 
+        if(getJobProperty().isCleanImages() && imageId != null) {
+            cleanImages(imageId);
+        }
+    }
+    
+    private void cleanImages(String imageId) {
+        DockerClient client = getClient();
+        client.removeImageCmd(imageId)
+                .withForce()
+                .exec();
+    }
+    
+    private String commitContainer() {
         DockerClient client = getClient();
 
         // Tag with job name if no repository name is given.
         String repositoryName;
         if(Strings.isNullOrEmpty(getJobProperty().getRepositoryName())){
-            repositoryName = cleanImageRepositoryName(
-                    theRun.getParent().getDisplayName()
-                    );
+            repositoryName = getJobName();
         } else {
-            repositoryName = cleanImageRepositoryName(
-                    getJobProperty().getRepositoryName()
-                    );
+            repositoryName = getJobProperty().getRepositoryName();
         }
         
-        LOGGER.log(Level.INFO, "Tagging with repository: " + repositoryName);
+        LOGGER.log(Level.INFO, "Tagging with repository: {0}", repositoryName);
 
         // Get our list of tags, or use the build number
         ArrayList<String> imageTags = new ArrayList<String>(
@@ -174,62 +196,52 @@ public class DockerSlave extends AbstractCloudSlave {
 
         // If there's no tags, or if specified, tag with the build number
         if(imageTags.isEmpty() || getJobProperty().isTagBuildNumber()) {
-            imageTags.add(theRun.getDisplayName());
+            imageTags.add(getBuildNumber());
         }
 
         // Commit image and get new image ID
         String imageId = client.commitCmd(containerId)
                     .withAuthor(getJobProperty().getImageAuthor())
                     .exec();
-        LOGGER.log(Level.INFO, "Commited to image: " + imageId);
+        LOGGER.log(Level.INFO, "Commited to image: {0}", imageId);
 
         // Iterate list of tags, and tag appropriately
         for(String tag : imageTags) {
-            // Clean up the image tag
-            String cleanTag = cleanImageTag(tag);
-
             // Skip empty tags
-            if(Strings.isNullOrEmpty(cleanTag)){
+            if(Strings.isNullOrEmpty(tag)){
                 continue;
             }
-            LOGGER.log(Level.INFO, "Tagging with: " + cleanTag);
+            LOGGER.log(Level.INFO, "Tagging with: {0}", tag);
 
             // Tag the image!
             try {
-                client.tagImageCmd(imageId, repositoryName, cleanTag)
+                client.tagImageCmd(imageId, repositoryName, tag)
                     .withForce()
                     .exec();
-                // addJenkinsAction(cleanTag);
             } catch(Exception ex) {
-                LOGGER.log(Level.SEVERE, "Could not add tag: " + cleanTag, ex);
+                LOGGER.log(Level.SEVERE, "Could not add tag: {0}", tag);
             }
         }
-
-        // Add a Jenkins 'Action' for the newly committed image
-        addJenkinsAction(imageId);
-
-        if( getJobProperty().cleanImages ) {
-            client.removeImageCmd(imageId)
-                .withForce()
-                .exec();
-        }
+        return imageId;
     }
 
-    /* Image names are made up of: [registry.domain/][username/]repository:tag
-     * Registry should be a valid domain, with at least one dot (.)
-     * Namespace and repository should match [a-z0-9-_.]
-     * Tags should match [A-Za-z0-9_.-]
-     * TODO: Match each part of the full repository name.
+    /**
+     * Returns the job name without any non-docker-friendly characters
      */
-    private static String cleanImageRepositoryName(String repositoryName) {
-        return repositoryName.toLowerCase()
+    private String getJobName() {
+        String jobName = theRun.getParent().getDisplayName();
+        return jobName.toLowerCase()
                              .replaceAll("\\s", "_")
                              .replaceAll("[^/a-z0-9-_.]", "");
     }
 
-    private static String cleanImageTag(String imageTag) {
-        return imageTag.replaceAll("\\s", "_")
-                       .replaceAll("[^A-Za-z0-9_.-]", "");
+    /**
+     * Returns the build number without any non-docker-friendly characters
+     */
+    private String getBuildNumber() {
+        String buildNumber = theRun.getDisplayName();
+        return buildNumber.replaceAll("\\s", "_")
+                          .replaceAll("[^A-Za-z0-9_.-]", "");
     }
     
     /**
