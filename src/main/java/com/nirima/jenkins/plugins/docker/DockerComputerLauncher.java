@@ -1,9 +1,7 @@
 package com.nirima.jenkins.plugins.docker;
 
-
 import com.cloudbees.plugins.credentials.common.StandardUsernameCredentials;
 import com.google.common.base.Preconditions;
-
 import com.github.dockerjava.api.command.InspectContainerResponse;
 import com.github.dockerjava.api.model.ExposedPort;
 import com.github.dockerjava.api.model.Ports;
@@ -12,11 +10,8 @@ import com.nirima.jenkins.plugins.docker.utils.RetryingComputerLauncher;
 import hudson.plugins.sshslaves.SSHLauncher;
 import hudson.slaves.ComputerLauncher;
 import hudson.slaves.DelegatingComputerLauncher;
-
 import java.net.MalformedURLException;
 import java.net.URL;
-
-
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
@@ -27,18 +22,29 @@ import java.util.logging.Logger;
  */
 public class DockerComputerLauncher extends DelegatingComputerLauncher {
 
-    private static final Logger LOGGER = Logger.getLogger(DockerComputerLauncher.class.getName());
+    private static final Logger LOGGER = Logger.getLogger(
+            DockerComputerLauncher.class.getName()
+    );
 
-    public DockerComputerLauncher(DockerTemplate template, InspectContainerResponse containerInspectResponse) {
+    public DockerComputerLauncher(
+            DockerTemplate template, 
+            InspectContainerResponse containerInspectResponse) {
         super(makeLauncher(template, containerInspectResponse));
     }
 
-    private static ComputerLauncher makeLauncher(DockerTemplate template, InspectContainerResponse containerInspectResponse) {
-        SSHLauncher sshLauncher = getSSHLauncher(containerInspectResponse, template);
+    private static ComputerLauncher makeLauncher(
+            DockerTemplate template, 
+            InspectContainerResponse containerInspectResponse) {
+        SSHLauncher sshLauncher = getSSHLauncher(
+                containerInspectResponse, 
+                template
+        );
         return new RetryingComputerLauncher(sshLauncher);
     }
 
-    private static SSHLauncher getSSHLauncher(InspectContainerResponse detail, DockerTemplate template)   {
+    private static SSHLauncher getSSHLauncher(
+            InspectContainerResponse detail, 
+            DockerTemplate template)   {
         Preconditions.checkNotNull(template);
         Preconditions.checkNotNull(detail);
 
@@ -47,25 +53,41 @@ public class DockerComputerLauncher extends DelegatingComputerLauncher {
             int port = 22;
             String host = null;
 
-            Ports.Binding[] bindings = detail.getNetworkSettings().getPorts().getBindings().get(sshPort);
-
+            Ports.Binding[] bindings = detail.getNetworkSettings()
+                    .getPorts()
+                    .getBindings()
+                    .get(sshPort);
+            
             for(Ports.Binding b : bindings) {
                 port = b.getHostPort();
                 host = b.getHostIp();
             }
 
-            if (host == null) {
+            // Don't try and SSH to `null` or `0.0.0.0`
+            if(host == null || host.equals("0.0.0.0")) {
                 URL hostUrl = new URL(template.getParent().serverUrl);
                 host = hostUrl.getHost();
             }
 
-            LOGGER.log(Level.INFO, "Creating slave SSH launcher for " + host + ":" + port);
+            LOGGER.log(Level.INFO, 
+                    "Creating slave SSH launcher for {0}:{1}", 
+                    new Object[]{host, port}
+            );
             
             PortUtils.waitForPort(host, port);
-
-            StandardUsernameCredentials credentials = SSHLauncher.lookupSystemCredentials(template.credentialsId);
-
-            return new SSHLauncher(host, port, credentials,  template.jvmOptions , template.javaPath, template.prefixStartSlaveCmd, template.suffixStartSlaveCmd, template.getSSHLaunchTimeoutMinutes() * 60);
+            StandardUsernameCredentials credentials = 
+                    SSHLauncher.lookupSystemCredentials(template.credentialsId);
+            
+            return new SSHLauncher(
+                    host, 
+                    port, 
+                    credentials,  
+                    template.jvmOptions , 
+                    template.javaPath, 
+                    template.prefixStartSlaveCmd, 
+                    template.suffixStartSlaveCmd, 
+                    template.getSSHLaunchTimeoutMinutes() * 60
+            );
 
         } catch(NullPointerException ex) {
             throw new RuntimeException("No mapped port 22 in host for SSL. Config=" + detail);
