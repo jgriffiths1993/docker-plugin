@@ -5,7 +5,6 @@ import com.nirima.jenkins.plugins.docker.utils.Cacheable;
 import hudson.model.*;
 import hudson.slaves.AbstractCloudComputer;
 
-import java.util.Date;
 import java.util.concurrent.Callable;
 import java.util.logging.Level;
 import java.util.logging.Logger;
@@ -38,21 +37,21 @@ public class DockerComputer extends AbstractCloudComputer<DockerSlave> {
     @Override
     public void taskAccepted(Executor executor, Queue.Task task) {
         super.taskAccepted(executor, task);
-        LOGGER.fine(" Computer " + this + " taskAccepted");
+        LOGGER.log(Level.FINE, "Computer {0} taskAccepted", this);
     }
 
     @Override
     public void taskCompleted(Executor executor, Queue.Task task, long durationMS) {
         Queue.Executable executable = executor.getCurrentExecutable();
 
-        LOGGER.log(Level.FINE, " Computer " + this + " taskCompleted");
+        LOGGER.log(Level.FINE, "Computer {0} taskCompleted", this);
 
-        if( executable instanceof Run) {
+        if( executable instanceof Run ) {
             Run build = (Run) executable;
             DockerSlave slave = getNode();
 
             if( slave == null ) {
-                LOGGER.log(Level.FINE, " Ignoring TaskCompleted for " + this + " as node has already been removed.");
+                LOGGER.log(Level.FINE, "Ignoring TaskCompleted for {0} as node has already been removed.", this);
             } else {
                 slave.setRun(build);
             }
@@ -68,57 +67,53 @@ public class DockerComputer extends AbstractCloudComputer<DockerSlave> {
     @Override
     public void taskCompletedWithProblems(Executor executor, Queue.Task task, long durationMS, Throwable problems) {
         super.taskCompletedWithProblems(executor, task, durationMS, problems);
-        LOGGER.log(Level.FINE, " Computer " + this + " taskCompletedWithProblems");
+        LOGGER.log(Level.FINE, " Computer {0} taskCompletedWithProblems", this);
     }
 
     @Override
     public boolean isAcceptingTasks() {
-
         boolean result = super.isAcceptingTasks();
 
         // Quit quickly if we aren't accepting tasks
-        if( !result )
+        if( !result ) {
             return false;
+        }
 
         // Update
         updateAcceptingTasks();
 
         // Are we still accepting tasks?
         result = super.isAcceptingTasks();
-
         return result;
     }
 
     private void updateAcceptingTasks() {
         try {
-
             int pause = 5000;
-            if (getOfflineCause() != null) {
-                if (getOfflineCause().toString().contains("failed to launch the slave agent") && checked < 3) {
-                    LOGGER.log(Level.INFO, "Slave agent not launched after checking " + checked + " time(s).  Waiting for any retries...");
+            if( getOfflineCause() != null ) {
+                if( getOfflineCause().toString().contains("failed to launch the slave agent") && checked < 3 ) {
+                    LOGGER.log(Level.INFO, "Slave agent not launched after checking {0} time(s).  Waiting for any retries...", checked);
                     checked += 1;
                     Thread.sleep(pause);
                 } else {
                     setAcceptingTasks(false);
-                    LOGGER.log(Level.INFO, " Offline " + this + " due to " + getOfflineCause());
+                    LOGGER.log(Level.INFO, " Offline {0} due to {1}", new Object[]{this, getOfflineCause()});
                 }
-            } else if (!nodeExistenceStatus.get()) {
+            } else if( !nodeExistenceStatus.get() ) {
                 setAcceptingTasks(false);
             }
         } catch (Exception ex) {
-            LOGGER.log(Level.INFO, " Computer " + this + " error getting node");
+            LOGGER.log(Level.INFO, " Computer {0} error getting node", this);
             setAcceptingTasks(false);
         }
     }
 
-    public void onConnected(){
+    public void onConnected() {
         DockerSlave node = getNode();
-        if (node != null) {
+        if( node != null ) {
             node.onConnected();
         }
     }
-
-
 
     @Override
     public String toString() {
