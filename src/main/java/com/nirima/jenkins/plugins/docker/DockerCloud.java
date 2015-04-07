@@ -107,7 +107,7 @@ public class DockerCloud extends Cloud {
             this.templates = new ArrayList<DockerTemplate>();
         }
 
-        if(containerCapStr.equals("")) {
+        if(Strings.isNullOrEmpty(containerCapStr)) {
             this.containerCap = Integer.MAX_VALUE;
         } else {
             this.containerCap = Integer.parseInt(containerCapStr);
