@@ -22,9 +22,7 @@ import java.util.logging.Logger;
  */
 public class DockerComputerLauncher extends DelegatingComputerLauncher {
 
-    private static final Logger LOGGER = Logger.getLogger(
-            DockerComputerLauncher.class.getName()
-    );
+    private static final Logger LOGGER = Logger.getLogger(DockerComputerLauncher.class.getName());
 
     public DockerComputerLauncher(DockerTemplate template, InspectContainerResponse containerInspectResponse) {
         super(makeLauncher(template, containerInspectResponse));
