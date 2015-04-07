@@ -101,10 +101,11 @@ public class DockerCloud extends Cloud {
         this.serverUrl = serverUrl;
         this.connectTimeout = connectTimeout;
         this.readTimeout = readTimeout;
-        if( templates != null )
+        if( templates != null ) {
             this.templates = new ArrayList<DockerTemplate>(templates);
-        else
+        } else {
             this.templates = new ArrayList<DockerTemplate>();
+        }
 
         if(containerCapStr.equals("")) {
             this.containerCap = Integer.MAX_VALUE;
