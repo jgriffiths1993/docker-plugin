@@ -77,8 +77,7 @@ public class DockerJobProperty extends hudson.model.JobProperty<AbstractProject<
         this.tagLatest = tagLatest;
         this.tagBuildNumber = tagBuildNumber;
         this.repositoryName = repositoryName;
-        this.imageTags = imageTags;
-        
+        this.imageTags = imageTags;    
     }
 
     @Exported
@@ -127,7 +126,7 @@ public class DockerJobProperty extends hudson.model.JobProperty<AbstractProject<
          * Adds the additionalTag string here to maintain backward compatibility.
          * Remove refs in stable?
          */
-        if(!Strings.isNullOrEmpty(additionalTag)) {
+        if( !Strings.isNullOrEmpty(additionalTag) ) {
             return additionalTag + "," + imageTags;
         } else {
             return imageTags;
@@ -146,7 +145,7 @@ public class DockerJobProperty extends hudson.model.JobProperty<AbstractProject<
         }
 
         public FormValidation doCheckRepositoryName(@QueryParameter String repositoryName) {
-            if(repositoryName == null || repositoryName.length() == 0) {
+            if( repositoryName == null || repositoryName.length() == 0 ) {
                 return FormValidation.ok();
             }
             String registry = null;
@@ -156,40 +155,32 @@ public class DockerJobProperty extends hudson.model.JobProperty<AbstractProject<
             String[] nameParts = repositoryName.split("/");
             
             // Only contains repository name
-            if(nameParts.length == 1) {
+            if( nameParts.length == 1 ) {
                 repository = nameParts[0];
-                // namespace = "library";
-                // registry = "docker.io";
+
             // Contains registry/repository or namespace/repository
-            } else if(nameParts.length == 2) {
-                if(nameParts[0].contains(":") ||
-                   nameParts[0].contains(".") ||
-                   nameParts[0].equals("localhost")){
-                    // registry/repository
+            } else if( nameParts.length == 2 ) {
+                if( nameParts[0].contains(":") || nameParts[0].contains(".") || nameParts[0].equals("localhost") ) {
                     registry = nameParts[0];
-                    // namespace = "library";
                 } else {
-                    // namespace/repository
-                    // registry = "docker.io";
                     namespace = nameParts[0];
                 }
                 repository = nameParts[1];
                 
             // Full 3 part registry/namespace/repository
-            } else if (nameParts.length == 3) {
+            } else if( nameParts.length == 3 ) {
                 registry = nameParts[0];
                 namespace = nameParts[1];
                 repository = nameParts[2];
+
             // Can't contain more than 3
-            } else if (nameParts.length > 3) {
-                return FormValidation.error(
-                        "More than 3 parts in registry name"
-                );
+            } else if( nameParts.length > 3 ) {
+                return FormValidation.error("More than 3 parts in registry name");
             }
             
             // Docker doesn't actually check anything else yet
-            if(registry != null) {
-                if(registry.contains("://")) {
+            if( registry != null ) {
+                if( registry.contains("://") ) {
                     return FormValidation.error("Registry should not contain schema");
                 }    
             }
@@ -198,27 +189,19 @@ public class DockerJobProperty extends hudson.model.JobProperty<AbstractProject<
             if(namespace != null){
                 Pattern namespaceRegexp = Pattern.compile("^([a-z0-9-_]*)$");
                 if(!namespaceRegexp.matcher(namespace).matches()){
-                    return FormValidation.error(
-                            "Invalid namespace:" + namespace
-                    );
+                    return FormValidation.error("Invalid namespace:" + namespace);
                 }
                 // Check namespace length
                 if(namespace.length() < 2 || namespace.length() > 255) {
-                    return FormValidation.error(
-                            "Namespace must be between 2 and 255 characters long"
-                    );
+                    return FormValidation.error("Namespace must be between 2 and 255 characters long");
                 }
                 // No start/end with hyphon
                 if(namespace.startsWith("-") || namespace.endsWith("-")) {
-                    return FormValidation.error(
-                            "Namespace cannot start or end with a hyphon"
-                    );
+                    return FormValidation.error("Namespace cannot start or end with a hyphon");
                 }
                 // No double hyphons
                 if(namespace.contains("--")) {
-                    return FormValidation.error(
-                            "Namespace cannot contain consecutive hyphons"
-                    );
+                    return FormValidation.error("Namespace cannot contain consecutive hyphons");
                 }
             }
             
@@ -227,24 +210,26 @@ public class DockerJobProperty extends hudson.model.JobProperty<AbstractProject<
             if(repository.contains(":")) {
                 return FormValidation.error("Do not include tags here");
             }
-            
+            // Check that it matches docker's regexp
             Pattern repositoryRegexp = Pattern.compile("^([a-z0-9-_.]+)$");
             if(!repositoryRegexp.matcher(repository).matches()) {
                 return FormValidation.error("Invalid repository name");
             }
-            
+            // Let the user know that they're using a private registry in their name
             if(registry != null) {
                 return FormValidation.ok("Using private registry " + registry);
             }
-            
             return FormValidation.ok();
         }
 
         public FormValidation doCheckImageTags(@QueryParameter String imageTags) {
+            // It's allowed to be empty
             if(imageTags == null || imageTags.length() == 0) {
                 return FormValidation.ok();
             }
+            // Split them by the possible delimiters
             String[] tags = imageTags.split("[,:;]");
+            // Iterate the tags and match them, or return a validation error
             Pattern tagRegexp = Pattern.compile("^[\\w][\\w.-]{0,127}$");
             for(String tag : tags) {
                 if(!tagRegexp.matcher(tag).matches()) {
@@ -257,7 +242,6 @@ public class DockerJobProperty extends hudson.model.JobProperty<AbstractProject<
         @Override
         public DockerJobProperty newInstance(StaplerRequest sr, JSONObject formData) 
         throws hudson.model.Descriptor.FormException {
-
             return new DockerJobProperty(
                     (Boolean)formData.get("tagOnCompletion"),
                     (Boolean)formData.get("cleanImages"),
