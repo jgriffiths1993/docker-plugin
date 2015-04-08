@@ -1,0 +1,19 @@
+<?jelly escape-by-default='true'?>
+<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define" xmlns:l="/lib/layout" 
+         xmlns:t="/lib/hudson" xmlns:f="/lib/form">
+	
+    <l:layout title="${descriptor.displayName}">
+        <l:main-panel>
+            <h1>Docker Build Data</h1>
+            <b>Host:</b> ${it.dockerHost}<br />
+            <b>Container:</b> ${it.containerId}<br />
+            
+            <j:if test="${it.imageId != null}">
+                <b>Image ID:</b> ${it.imageId}<br />
+                <j:if test="${it.repositoryName != null}">
+                    <b>Repository:</b> ${it.repositoryName}
+                </j:if>
+            </j:if>
+	</l:main-panel>
+    </l:layout>
+</j:jelly>

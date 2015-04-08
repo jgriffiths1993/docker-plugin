@@ -6,7 +6,7 @@ import com.google.common.base.Strings;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.NotModifiedException;
 import com.github.dockerjava.api.NotFoundException;
-import com.nirima.jenkins.plugins.docker.action.DockerBuildAction;
+import com.nirima.jenkins.plugins.docker.action.BuiltOnDockerAction;
 import hudson.Extension;
 import hudson.model.*;
 import hudson.model.queue.CauseOfBlockage;
@@ -15,6 +15,7 @@ import hudson.slaves.ComputerLauncher;
 import hudson.slaves.NodeProperty;
 import hudson.slaves.RetentionStrategy;
 import org.kohsuke.stapler.DataBoundConstructor;
+
 import java.io.IOException;
 import java.util.List;
 import java.util.ArrayList;
@@ -27,15 +28,14 @@ import java.util.logging.Logger;
 
 public class DockerSlave extends AbstractCloudSlave {
 
-    private static final Logger LOGGER = Logger.getLogger(
-            DockerSlave.class.getName()
-    );
+    private static final Logger LOGGER = Logger.getLogger(DockerSlave.class.getName());
 
     public final DockerTemplate dockerTemplate;
     public final String containerId;
-
+    
+    public String imageId;
     private transient Run theRun;
-
+    
     @DataBoundConstructor
     public DockerSlave(
             DockerTemplate dockerTemplate, 
@@ -62,6 +62,7 @@ public class DockerSlave extends AbstractCloudSlave {
                 retentionStrategy, 
                 nodeProperties
         );
+        this.imageId = null;
         Preconditions.checkNotNull(dockerTemplate);
         Preconditions.checkNotNull(containerId);
 
@@ -151,10 +152,8 @@ public class DockerSlave extends AbstractCloudSlave {
     
     /**
      * Takes the Jenkins slave offline
-     * TODO: Add handling for returned future<> object to check the status
-     * of the action.
      */
-    private Future<?> disconnectSlave() {
+    private Future<?> disconnectSlave() throws RuntimeException {
         Computer slaveComputer = toComputer();
         if( slaveComputer != null ){
             return slaveComputer.disconnect();
@@ -166,7 +165,7 @@ public class DockerSlave extends AbstractCloudSlave {
      * Returns whether build is successful.
      */
     private boolean isSuccessfulBuild() {
-        if(theRun == null) {
+        if( theRun == null ) {
             return false;
         }
         Result result = theRun.getResult();
@@ -174,13 +173,7 @@ public class DockerSlave extends AbstractCloudSlave {
     }
     
     @Override
-    protected void _terminate(TaskListener listener) 
-            throws IOException, InterruptedException {
-        
-        // Disconnect slave from Jenkins
-        // Track disconnection status
-        // Stop container unless remainsRunning
-        // Check if we have a 'theRun' and analyse it... appropriately...
+    protected void _terminate(TaskListener listener) throws IOException, InterruptedException {
         
         // Disconnects Jenkins slave.
         Future<?> slaveDisconnection = disconnectSlave();
@@ -189,11 +182,10 @@ public class DockerSlave extends AbstractCloudSlave {
         }
         
         if(theRun != null) {
-            String imageId = null;
             if(getJobProperty().commitContainer) {
                 imageId = commitContainer();
             }
-            addJenkinsAction(imageId);
+            addJenkinsAction();
             if(getJobProperty().cleanImages && imageId != null) {
                 cleanImages(imageId);
             }    
@@ -295,14 +287,12 @@ public class DockerSlave extends AbstractCloudSlave {
      * @param tag_image
      * @throws IOException
      */
-    private void addJenkinsAction(String tag_image) throws IOException {
-        theRun.addAction(
-                new DockerBuildAction(
-                    getCloud().serverUrl, 
-                    containerId, 
-                    tag_image, 
-                    dockerTemplate.remoteFsMapping) 
-                );
+    private void addJenkinsAction() throws IOException {
+        BuiltOnDockerAction buildAction = new BuiltOnDockerAction(containerId, getCloud().serverUrl);
+        buildAction.imageId = imageId;
+        buildAction.remoteFsMapping = remoteFS;
+        buildAction.repositoryName = this.getJobProperty().repositoryName;
+        theRun.addAction(buildAction);
         theRun.save();
     }
 

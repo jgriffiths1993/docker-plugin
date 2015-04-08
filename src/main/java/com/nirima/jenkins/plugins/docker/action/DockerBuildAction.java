@@ -18,9 +18,7 @@ public class DockerBuildAction implements Action, Serializable, Cloneable, Descr
 
     public final String containerHost;
     public final String containerId;
-
     public final String taggedId;
-
     public final String remoteFsMapping;
 
     public DockerBuildAction(String containerHost, String containerId, String taggedId, String remoteFsMapping) {
