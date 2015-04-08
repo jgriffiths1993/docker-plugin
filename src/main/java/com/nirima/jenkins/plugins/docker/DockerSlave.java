@@ -184,21 +184,21 @@ public class DockerSlave extends AbstractCloudSlave {
         
         // Disconnects Jenkins slave.
         Future<?> slaveDisconnection = disconnectSlave();
-        if(!getJobProperty().isRemainsRunning()) {
+        if(!getJobProperty().remainsRunning) {
             stopContainer(); 
         }
         
         if(theRun != null) {
             String imageId = null;
-            if(getJobProperty().isTagOnCompletion()) {
+            if(getJobProperty().commitContainer) {
                 imageId = commitContainer();
             }
             addJenkinsAction(imageId);
-            if(getJobProperty().isCleanImages() && imageId != null) {
+            if(getJobProperty().cleanImages && imageId != null) {
                 cleanImages(imageId);
             }    
         }
-        if(!getJobProperty().isRemainsRunning()) {
+        if(!getJobProperty().remainsRunning) {
             removeContainer();
         }
         
@@ -225,30 +225,30 @@ public class DockerSlave extends AbstractCloudSlave {
 
         // Tag with job name if no repository name is given.
         String repositoryName;
-        if(Strings.isNullOrEmpty(getJobProperty().getRepositoryName())){
+        if(Strings.isNullOrEmpty(getJobProperty().repositoryName)) {
             repositoryName = getJobName();
         } else {
-            repositoryName = getJobProperty().getRepositoryName();
+            repositoryName = getJobProperty().repositoryName;
         }
         LOGGER.log(Level.INFO, "Tagging with repository: {0}", repositoryName);
         // Get our list of tags, or use the build number
         ArrayList<String> imageTags = new ArrayList<String>(
                 Arrays.asList(getJobProperty()
-                                .getImageTags()
+                                .imageTags
                                 .split("[,;:]")
                 )
         );
         // Tag latest if specified
-        if(getJobProperty().isTagLatest()) {
+        if( getJobProperty().tagLatest ) {
             imageTags.add("latest");
         }
         // If there's no tags, or if specified, tag with the build number
-        if(imageTags.isEmpty() || getJobProperty().isTagBuildNumber()) {
+        if( imageTags.isEmpty() || getJobProperty().tagBuildNumber ) {
             imageTags.add(getBuildNumber());
         }
         // Commit image and get new image ID
         String imageId = client.commitCmd(containerId)
-                    .withAuthor(getJobProperty().getImageAuthor())
+                    .withAuthor(getJobProperty().imageAuthor)
                     .exec();
         LOGGER.log(Level.INFO, "Commited to image: {0}", imageId);
 
@@ -342,16 +342,8 @@ public class DockerSlave extends AbstractCloudSlave {
             // Don't care.
         }
         // Safe default
-        return new DockerJobProperty(
-                false, 
-                false, 
-                false, 
-                null, 
-                false, 
-                false, 
-                null, 
-                null
-        );
+        return new DockerJobProperty();
+                
     }
 
     @Extension

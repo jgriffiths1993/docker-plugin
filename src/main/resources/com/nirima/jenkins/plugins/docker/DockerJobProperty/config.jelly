@@ -1,22 +1,17 @@
 <?jelly escape-by-default='true'?>
-<j:jelly xmlns:j="jelly:core" 
-         xmlns:st="jelly:stapler" 
-         xmlns:d="jelly:define" 
-         xmlns:l="/lib/layout" 
-         xmlns:t="/lib/hudson" 
-         xmlns:f="/lib/form" 
-         xmlns:c="/lib/credentials">
+<j:jelly xmlns:j="jelly:core" xmlns:st="jelly:stapler" xmlns:d="jelly:define" xmlns:l="/lib/layout" 
+         xmlns:t="/lib/hudson" xmlns:f="/lib/form" xmlns:c="/lib/credentials">
 
-    <f:section title="Docker Slave Container">
+    <f:section title="${descriptor.displayName}">
         <f:advanced>
+            
             <f:entry title="${%Remains Running}" field="remainsRunning">
                 <f:checkbox default="true" />
             </f:entry>
 
-            <f:optionalBlock field="tagOnCompletion" 
-                             inline="true" 
-                             name="tagOnCompletion" 
-                             title="${%Commit on successful build}">
+            <!-- Section specific to committed containers (images) -->
+            <f:optionalBlock field="commitContainer" inline="true" name="commitContainer" 
+                             title="${%Commit Container}">
                 
                 <f:entry title="${%Repository name}" field="repositoryName">
                     <f:textbox />
@@ -26,8 +21,7 @@
                     <f:checkbox />
                 </f:entry>
 
-                <f:entry title="${%Tag with build number}" 
-                         field="tagBuildNumber">
+                <f:entry title="${%Tag with build number}" field="tagBuildNumber">
                     <f:checkbox />
                 </f:entry>
 
@@ -42,7 +36,9 @@
                 <f:entry title="${%Clean local images}" field="cleanImages">
                     <f:checkbox />
                 </f:entry>
+                
             </f:optionalBlock>
+            
         </f:advanced>
     </f:section>
 

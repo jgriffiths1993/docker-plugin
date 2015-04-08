@@ -4,134 +4,45 @@ import hudson.Extension;
 import hudson.model.AbstractProject;
 import hudson.model.Job;
 import hudson.model.JobPropertyDescriptor;
-import net.sf.json.JSONObject;
-import org.kohsuke.stapler.DataBoundConstructor;
-import org.kohsuke.stapler.StaplerRequest;
-import org.kohsuke.stapler.export.Exported;
-import com.google.common.base.Strings;
 import hudson.util.FormValidation;
-import java.util.regex.Pattern;
+import org.kohsuke.stapler.DataBoundConstructor;
+import org.kohsuke.stapler.DataBoundSetter;
 import org.kohsuke.stapler.QueryParameter;
+
+import java.util.regex.Pattern;
 
 
 public class DockerJobProperty extends hudson.model.JobProperty<AbstractProject<?, ?>> {
     
-    /**
-     * Tag on completion (commit).
-     */
-    public final boolean tagOnCompletion;
-    public final boolean cleanImages;
+    // Empty constructor - using DataBoundSetter instead
+    @DataBoundConstructor public DockerJobProperty() {}
+    
+    // Commit container when build completes
+    @DataBoundSetter public boolean commitContainer = true;
+    
+    // Remove committed image
+    @DataBoundSetter public boolean cleanImages;
+    
+    //Keep containers running after successful builds
+    @DataBoundSetter public boolean remainsRunning;
 
-    /**
-     * Keep containers running after successful builds
-     */
-    public final boolean remainsRunning;
+    //Author of the image
+    @DataBoundSetter public String imageAuthor;
 
-    /**
-     * Author of the image
-     */
-    public final String imageAuthor;
+    // Tag committed image as 'latest'
+    @DataBoundSetter public boolean tagLatest;
+    
+    // Tag the committed image with the build number
+    @DataBoundSetter public boolean tagBuildNumber;
+    
+    // Repository name to use for the image, including domain/namespace
+    @DataBoundSetter public String repositoryName;
 
-    /**
-     * Whether to tag the committed image as 'latest'
-     */
-    public final boolean tagLatest;
-
-    /**
-     * Whether to tag the committed image with the build number
-     */
-    public final boolean tagBuildNumber;
-
-    /**
-     * Repository name to use for the image, including domain/namespace
-     */
-    public final String repositoryName;
-
-    /** 
-     * List of tags, delimited by commas or semi-colons
-     */
-    public final String imageTags;
-
-    /**
-     * Kept for backwards compatibility with existing data
-     */
-    public final String additionalTag;
-
-
-    @DataBoundConstructor
-    public DockerJobProperty(
-            boolean tagOnCompletion, 
-            boolean cleanImages,
-            boolean remainsRunning,
-            String imageAuthor,
-            boolean tagLatest,
-            boolean tagBuildNumber,
-            String repositoryName,
-            String imageTags ) 
-    {
-        this.additionalTag = "";
-        this.tagOnCompletion = tagOnCompletion;
-        this.cleanImages = cleanImages;
-        this.remainsRunning = remainsRunning;
-        this.imageAuthor = imageAuthor;
-        this.tagLatest = tagLatest;
-        this.tagBuildNumber = tagBuildNumber;
-        this.repositoryName = repositoryName;
-        this.imageTags = imageTags;    
-    }
-
-    @Exported
-    public boolean isPushOnSuccess() {
-        return false;
-    }
-
-    @Exported
-    public boolean isTagOnCompletion() {
-        return tagOnCompletion;
-    }
-
-    @Exported
-    public boolean isCleanImages() {
-        return cleanImages;
-    }
-
-    @Exported
-    public boolean isRemainsRunning() {
-        return remainsRunning;
-    }
-
-    @Exported
-    public String getImageAuthor() {
-        return imageAuthor;
-    }
-
-    @Exported
-    public boolean isTagLatest() {
-        return tagLatest;
-    }
-
-    @Exported
-    public boolean isTagBuildNumber() {
-        return tagBuildNumber;
-    }
-
-    @Exported 
-    public String getRepositoryName() {
-        return repositoryName;
-    }
-
-    @Exported 
-    public String getImageTags() {
-        /*
-         * Adds the additionalTag string here to maintain backward compatibility.
-         * Remove refs in stable?
-         */
-        if( !Strings.isNullOrEmpty(additionalTag) ) {
-            return additionalTag + "," + imageTags;
-        } else {
-            return imageTags;
-        }
-    }
+    // List of tags, delimited by commas or semi-colons
+    @DataBoundSetter public String imageTags;
+    
+     // Kept for backwards compatibility with existing data
+    @DataBoundSetter public String additionalTag;
 
     @Extension
     public static final class DescriptorImpl extends JobPropertyDescriptor {
@@ -237,21 +148,6 @@ public class DockerJobProperty extends hudson.model.JobProperty<AbstractProject<
                 }
             }
             return FormValidation.ok();
-        }
-
-        @Override
-        public DockerJobProperty newInstance(StaplerRequest sr, JSONObject formData) 
-        throws hudson.model.Descriptor.FormException {
-            return new DockerJobProperty(
-                    (Boolean)formData.get("tagOnCompletion"),
-                    (Boolean)formData.get("cleanImages"),
-                    (Boolean)formData.get("remainsRunning"),
-                    (String)formData.get("imageAuthor"),
-                    (Boolean)formData.get("tagLatest"),
-                    (Boolean)formData.get("tagBuildNumber"),
-                    (String)formData.get("repositoryName"),
-                    (String)formData.get("imageTags")
-                    );
         }
     }
 }
