@@ -3,6 +3,7 @@ package com.nirima.jenkins.plugins.docker;
 import hudson.Extension;
 import hudson.model.AbstractProject;
 import hudson.model.Job;
+import hudson.model.JobProperty;
 import hudson.model.JobPropertyDescriptor;
 import hudson.util.FormValidation;
 import org.kohsuke.stapler.DataBoundConstructor;
@@ -10,15 +11,17 @@ import org.kohsuke.stapler.DataBoundSetter;
 import org.kohsuke.stapler.QueryParameter;
 
 import java.util.regex.Pattern;
+import net.sf.json.JSONObject;
+import org.kohsuke.stapler.StaplerRequest;
 
 
-public class DockerJobProperty extends hudson.model.JobProperty<AbstractProject<?, ?>> {
+public class DockerJobProperty extends JobProperty<AbstractProject<?, ?>> {
     
     // Empty constructor - using DataBoundSetter instead
     @DataBoundConstructor public DockerJobProperty() {}
     
     // Commit container when build completes
-    @DataBoundSetter public boolean commitContainer = true;
+    @DataBoundSetter public boolean commitContainer;
     
     // Remove committed image
     @DataBoundSetter public boolean cleanImages;
@@ -148,6 +151,14 @@ public class DockerJobProperty extends hudson.model.JobProperty<AbstractProject<
                 }
             }
             return FormValidation.ok();
+        }
+        
+        @Override
+        public JobProperty<?> newInstance(StaplerRequest req, JSONObject formData) throws FormException {
+            if (req.hasParameter("commitContainer") || req.hasParameter("remainsRunning")) {
+                return req.bindJSON(DockerJobProperty.class, formData);
+            }
+            return null;
         }
     }
 }

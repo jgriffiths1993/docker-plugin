@@ -6,7 +6,7 @@
         <f:advanced>
             
             <f:entry title="${%Remains Running}" field="remainsRunning">
-                <f:checkbox default="true" />
+                <f:checkbox />
             </f:entry>
 
             <!-- Section specific to committed containers (images) -->
