@@ -13,7 +13,7 @@ import org.kohsuke.stapler.export.ExportedBean;
  * @author jgriffiths1993 06/05/2015
  */
 @ExportedBean
-public class BuiltOnDockerAction implements Action, Serializable, Cloneable, Describable<DockerBuildAction> {
+public class BuiltOnDockerAction implements Action, Serializable, Cloneable, Describable<BuiltOnDockerAction> {
     
     // Construct with these as they should always be relevant
     public final String containerId;
@@ -53,7 +53,7 @@ public class BuiltOnDockerAction implements Action, Serializable, Cloneable, Des
     }
     
     @Extension
-    public static class DescriptorImpl extends Descriptor<DockerBuildAction> {
+    public static class DescriptorImpl extends Descriptor<BuiltOnDockerAction> {
         public String getDisplayName() {
             return "Docker";
         }
