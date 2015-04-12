@@ -6,7 +6,11 @@ import com.google.common.base.Strings;
 import com.github.dockerjava.api.DockerClient;
 import com.github.dockerjava.api.NotModifiedException;
 import com.github.dockerjava.api.NotFoundException;
+import com.github.dockerjava.api.command.PushImageCmd.Response;
+import com.github.dockerjava.api.model.AuthConfig;
 import com.nirima.jenkins.plugins.docker.action.BuiltOnDockerAction;
+import com.nirima.jenkins.plugins.docker.utils.DockerImageName;
+import com.nirima.jenkins.plugins.docker.utils.DockerImageName.TagName;
 import hudson.Extension;
 import hudson.model.*;
 import hudson.model.queue.CauseOfBlockage;
@@ -24,6 +28,7 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.logging.Level;
 import java.util.logging.Logger;
+import org.apache.commons.lang.StringUtils;
 
 
 public class DockerSlave extends AbstractCloudSlave {
@@ -143,10 +148,7 @@ public class DockerSlave extends AbstractCloudSlave {
         try {
             client.removeContainerCmd(containerId).exec();
         } catch (NotFoundException ex) {
-            LOGGER.log(Level.SEVERE, 
-                    "Failed to remove container: {0}. Doesn't exist.", 
-                    containerId
-            );
+            LOGGER.log(Level.SEVERE, "Failed to remove container: {0}. Doesn't exist.", containerId);
         }
     }
     
@@ -155,7 +157,7 @@ public class DockerSlave extends AbstractCloudSlave {
      */
     private Future<?> disconnectSlave() throws RuntimeException {
         Computer slaveComputer = toComputer();
-        if( slaveComputer != null ){
+        if (slaveComputer != null) {
             return slaveComputer.disconnect();
         }
         throw new RuntimeException("Could not get slave computer to disconnect");
@@ -165,7 +167,7 @@ public class DockerSlave extends AbstractCloudSlave {
      * Returns whether build is successful.
      */
     private boolean isSuccessfulBuild() {
-        if( theRun == null ) {
+        if (theRun == null) {
             return false;
         }
         Result result = theRun.getResult();
@@ -177,20 +179,21 @@ public class DockerSlave extends AbstractCloudSlave {
         
         // Disconnects Jenkins slave.
         Future<?> slaveDisconnection = disconnectSlave();
-        if(!getJobProperty().remainsRunning) {
+        if (!getJobProperty().remainsRunning) {
             stopContainer(); 
         }
         
-        if(theRun != null) {
-            if(getJobProperty().commitContainer) {
+        if (theRun != null) {
+            if (getJobProperty().commitContainer) {
                 imageId = commitContainer();
             }
             addJenkinsAction();
-            if(getJobProperty().cleanImages && imageId != null) {
+            if (getJobProperty().cleanImages && imageId != null) {
                 cleanImages(imageId);
-            }    
+            }
         }
-        if(!getJobProperty().remainsRunning) {
+
+        if (!getJobProperty().remainsRunning) {
             removeContainer();
         }
         
@@ -216,51 +219,60 @@ public class DockerSlave extends AbstractCloudSlave {
         DockerClient client = getClient();
 
         // Tag with job name if no repository name is given.
-        String repositoryName;
-        if(Strings.isNullOrEmpty(getJobProperty().repositoryName)) {
-            repositoryName = getJobName();
-        } else {
-            repositoryName = getJobProperty().repositoryName;
-        }
-        LOGGER.log(Level.INFO, "Tagging with repository: {0}", repositoryName);
+        DockerImageName imageName = new DockerImageName(
+                StringUtils.defaultIfEmpty(getJobProperty().repositoryName, theRun.getParent().getDisplayName())
+        ).makeValid();
+        LOGGER.log(Level.INFO, "Tagging with repository: {0}", imageName.getRegistry().toString());
+        
         // Get our list of tags, or use the build number
-        ArrayList<String> imageTags = new ArrayList<String>(
-                Arrays.asList(getJobProperty()
-                                .imageTags
-                                .split("[,;:]")
-                )
-        );
+        ArrayList<String> imageTags = new ArrayList<String>(Arrays.asList(getJobProperty().imageTags.split("[,]+")));
         // Tag latest if specified
-        if( getJobProperty().tagLatest ) {
+        if (getJobProperty().tagLatest) {
             imageTags.add("latest");
         }
         // If there's no tags, or if specified, tag with the build number
-        if( imageTags.isEmpty() || getJobProperty().tagBuildNumber ) {
+        if (imageTags.isEmpty() || getJobProperty().tagBuildNumber) {
             imageTags.add(getBuildNumber());
         }
         // Commit image and get new image ID
-        String imageId = client.commitCmd(containerId)
-                    .withAuthor(getJobProperty().imageAuthor)
-                    .exec();
+        imageId = client.commitCmd(containerId).withAuthor(getJobProperty().imageAuthor).exec();
         LOGGER.log(Level.INFO, "Commited to image: {0}", imageId);
 
         // Iterate list of tags, and tag appropriately
-        for(String tag : imageTags) {
-            // Skip empty tags
-            if(Strings.isNullOrEmpty(tag)){
+        for (String tag : imageTags) {
+            if (Strings.isNullOrEmpty(tag)){
                 continue;
             }
-            LOGGER.log(Level.INFO, "Tagging with: {0}", tag);
+            TagName tagName = new TagName(tag).makeValid();
             // Tag the image!
             try {
-                client.tagImageCmd(imageId, repositoryName, tag)
+                client.tagImageCmd(imageId, imageName.toString(), tagName.toString())
                     .withForce()
                     .exec();
             } catch(Exception ex) {
                 LOGGER.log(Level.SEVERE, "Could not add tag: {0}", tag);
             }
+            if (getJobProperty().pushImage) {
+                pushImage(imageId, imageName, tagName);
+            }
         }
+        LOGGER.log(Level.INFO, "Pushing image.");
         return imageId;
+    }
+    
+    private void pushImage(String imageId, DockerImageName imageName, TagName tagName) {
+        AuthConfig auth = new AuthConfig();
+        auth.setUsername("jgriffiths");
+        auth.setPassword("verigotta1");
+        if (imageName.getRegistry() != null) {
+            auth.setServerAddress(imageName.getRegistry().toString());
+        }
+        DockerClient client = getClient();
+        client.pushImageCmd(imageId)
+                .withName(imageName.toString())
+                // .withTag(tagName.toString())
+                .withAuthConfig(auth)
+                .exec();
     }
 
     /**
@@ -268,9 +280,7 @@ public class DockerSlave extends AbstractCloudSlave {
      */
     private String getJobName() {
         String jobName = theRun.getParent().getDisplayName();
-        return jobName.toLowerCase()
-                             .replaceAll("\\s", "_")
-                             .replaceAll("[^/a-z0-9-_.]", "");
+        return jobName.toLowerCase().replaceAll("\\s", "_").replaceAll("[^/a-z0-9-_.]", "");
     }
 
     /**
@@ -278,8 +288,7 @@ public class DockerSlave extends AbstractCloudSlave {
      */
     private String getBuildNumber() {
         String buildNumber = theRun.getDisplayName();
-        return buildNumber.replaceAll("\\s", "_")
-                          .replaceAll("[^A-Za-z0-9_.-]", "");
+        return buildNumber.replaceAll("\\s", "_").replaceAll("[^A-Za-z0-9_.-]", "");
     }
     
     /**
@@ -291,7 +300,7 @@ public class DockerSlave extends AbstractCloudSlave {
         BuiltOnDockerAction buildAction = new BuiltOnDockerAction(containerId, getCloud().serverUrl);
         buildAction.imageId = imageId;
         buildAction.remoteFsMapping = remoteFS;
-        buildAction.repositoryName = this.getJobProperty().repositoryName;
+        buildAction.repositoryName = getJobProperty().repositoryName;
         theRun.addAction(buildAction);
         theRun.save();
     }
@@ -303,9 +312,7 @@ public class DockerSlave extends AbstractCloudSlave {
     /**
      * Called when the slave is connected to Jenkins
      */
-    public void onConnected() {
-
-    }
+    public void onConnected() {}
 
     @Override
     public String toString() {
@@ -322,18 +329,17 @@ public class DockerSlave extends AbstractCloudSlave {
      */
     private DockerJobProperty getJobProperty() {
         try {
-            DockerJobProperty p = (DockerJobProperty) ((AbstractBuild) theRun)
+            DockerJobProperty jobProperty = (DockerJobProperty) ((AbstractBuild) theRun)
                     .getProject()
                     .getProperty(DockerJobProperty.class);
-            if (p != null) {
-                return p;
+            if (jobProperty != null) {
+                return jobProperty;
             }
         } catch(Exception ex) {
-            // Don't care.
+            LOGGER.log(Level.FINEST, "Encountered exception attempting to find DockerJobProperty.", ex);
         }
         // Safe default
         return new DockerJobProperty();
-                
     }
 
     @Extension
