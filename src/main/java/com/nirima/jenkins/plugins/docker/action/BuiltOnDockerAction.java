@@ -5,6 +5,7 @@ import hudson.model.Action;
 import hudson.model.Describable;
 import hudson.model.Descriptor;
 import java.io.Serializable;
+import java.util.ArrayList;
 import jenkins.model.Jenkins;
 import org.kohsuke.stapler.export.ExportedBean;
 
@@ -23,7 +24,7 @@ public class BuiltOnDockerAction implements Action, Serializable, Cloneable, Des
     public String imageId;
     public String remoteFsMapping;
     public String repositoryName;
-    public String[] imageTags;
+    public ArrayList<String> imageTags;
     
     public BuiltOnDockerAction(String containerId, String dockerHost) {
         this.containerId = containerId;

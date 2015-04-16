@@ -7,11 +7,12 @@
             <h1>Docker Build Data</h1>
             <b>Host:</b> ${it.dockerHost}<br />
             <b>Container:</b> ${it.containerId}<br />
-            
             <j:if test="${it.imageId != null}">
                 <b>Image ID:</b> ${it.imageId}<br />
                 <j:if test="${it.repositoryName != null}">
-                    <b>Repository:</b> ${it.repositoryName}
+                    <j:forEach items="${it.imageTags}" var="imageTag">
+                        <b>Tag:</b> ${it.repositoryName}:${imageTag}<br />
+                    </j:forEach>
                 </j:if>
             </j:if>
 	</l:main-panel>
