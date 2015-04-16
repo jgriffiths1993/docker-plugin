@@ -50,9 +50,9 @@ public class DockerTemplate extends DockerTemplateBase implements Describable<Do
 
 
     /**
-     * List of labels, NOT final as we'll append the container ID
+     * List of labels
      */
-    public String labelString;
+    public final String labelString;
 
     // SSH settings
     /**
@@ -104,7 +104,8 @@ public class DockerTemplate extends DockerTemplateBase implements Describable<Do
 
 
     @DataBoundConstructor
-    public DockerTemplate(String image, String labelString,
+    public DockerTemplate(String image, 
+                          String labelString,
                           String remoteFs,
                           String remoteFsMapping,
                           String credentialsId, String idleTerminationMinutes,
@@ -147,7 +148,7 @@ public class DockerTemplate extends DockerTemplateBase implements Describable<Do
         this.javaPath = javaPath;
         this.prefixStartSlaveCmd = prefixStartSlaveCmd;
         this.suffixStartSlaveCmd = suffixStartSlaveCmd;
-        if(Strings.isNullOrEmpty(remoteFs)){
+        if (Strings.isNullOrEmpty(remoteFs)){
             this.remoteFs = "/home/jenkins";
         } else {
             this.remoteFs = remoteFs;
@@ -285,9 +286,6 @@ public class DockerTemplate extends DockerTemplateBase implements Describable<Do
         nodeDescription += "]";
 
         String slaveName = containerId.substring(0,12);
-        
-        // Add container ID to list of labels
-        labelString += " " + slaveName;
         
         try {
             slaveName = slaveName + "@" + getParent().getDisplayName();
